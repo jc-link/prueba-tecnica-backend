@@ -3,6 +3,8 @@ package com.project.client_ms.configuration;
 import com.project.client_ms.dtos.AuthenticationResponseDTO;
 import com.project.client_ms.entities.AppUser;
 import com.project.client_ms.entities.Token;
+import com.project.client_ms.exceptions.ExpiredTokenException;
+import com.project.client_ms.exceptions.InvalidTokenException;
 import com.project.client_ms.repositories.AppUserRepository;
 import com.project.client_ms.repositories.TokenRepository;
 import com.project.client_ms.security.JwtService;
@@ -12,6 +14,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -27,6 +31,8 @@ import java.util.Optional;
 @Component
 @RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtAuthFilter.class);
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
@@ -52,7 +58,20 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         String jwtToken = authHeader.substring(7);
-        String username = jwtService.extractUsername(jwtToken);
+        String username;
+
+        try {
+            username = jwtService.extractUsername(jwtToken);
+        } catch (ExpiredTokenException e) {
+            logger.warn("Token expired: " + e.getMessage());
+            handleException(response, e.getMessage(), HttpServletResponse.SC_UNAUTHORIZED);
+            return;
+        } catch (InvalidTokenException e) {
+            logger.warn("Invalid token: " + e.getMessage());
+            handleException(response, e.getMessage(), HttpServletResponse.SC_UNAUTHORIZED);
+            return;
+        }
+
         if (username == null || SecurityContextHolder.getContext().getAuthentication() != null) {
             return;
         }
@@ -85,5 +104,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         SecurityContextHolder.getContext().setAuthentication(authToken);
         filterChain.doFilter(request, response);
 
+    }
+
+    private void handleException(HttpServletResponse response, String message, int status) throws IOException {
+        response.setStatus(status);
+        response.setContentType("application/json");
+        response.getWriter().write("{\"error\": \"" + message + "\"}");
+        response.getWriter().flush();
     }
 }

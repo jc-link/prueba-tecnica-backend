@@ -12,6 +12,7 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -35,6 +36,7 @@ public class ClientController {
 
     @PostMapping("/upload")
     public ResponseEntity<List<ClientDTO>> saveClients(@RequestParam("file") MultipartFile file) {
+
         LOGGER.info("Saving clients from Excel file");
         List<ClientDTO> clients = new ArrayList<>();
 
